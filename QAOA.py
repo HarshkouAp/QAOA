@@ -158,3 +158,4 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False):
     return (Solution, Probability, np.real(Energy), C_solution, C_energy, Iterator,
             Processing_time_QAOA, Processing_time_Cl)
 
+
