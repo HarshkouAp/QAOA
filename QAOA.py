@@ -6,7 +6,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def QAOA(Graph, P_param, max_iter=10000, callback=False):
+def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
 
     def Mix_operator_preset():
         X = np.array([[0, 1], [1, 0]])
@@ -28,7 +28,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False):
             preset[j] = preset[j][0:2**(N-1)]
         return np.array(preset)
 
-    def Hamiltonian():
+    def Hamiltonian_unweighted():
         I_arr = np.ones(2 ** N)
         Z_pauli = np.array([1, -1])
         ZZ_operator = np.zeros(2 ** N)
@@ -50,6 +50,30 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False):
         hamiltonian = (N_e * I_arr - ZZ_operator) / 2
         hamiltonian = hamiltonian[0:2**(N-1)]
         return hamiltonian * (-1)
+
+    def Hamiltonian_weighted():
+        edges_weights = nx.get_edge_attributes(Graph, "weight")
+        I_arr = np.ones(2 ** N)
+        Z_pauli = np.array([1, -1])
+        ZZ_operator = np.zeros(2 ** N)
+        ZZ_layer = 1
+        for j in range(N):
+            for k in range(j, N):
+                if j != k:
+                    arr = []
+                    if j in list(nx.all_neighbors(Graph, k)):
+                        for h in range(N):
+                            if (h == j) or (h == k):
+                                arr.append("Z")
+                                ZZ_layer = np.kron(Z_pauli, ZZ_layer)
+                            else:
+                                ZZ_layer = np.kron(np.ones(2), ZZ_layer)
+                                arr.append("I")
+                        ZZ_operator += edges_weights[(j, k)] * (I_arr - ZZ_layer) / 2
+                    ZZ_layer = 1
+        hamiltonian = ZZ_operator
+        hamiltonian = hamiltonian[0:2 ** (N - 1)]
+        return hamiltonian
 
     def Black_box_function(ang_arr):
 
@@ -96,7 +120,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False):
 
         return solution, probability
 
-    def MaxCut_clasical_solver():
+    def MaxCut_classical_solver_unweighted():
         num_of_states = 2 ** N
         state_arr = np.array(['0' * N])
         for k in range(num_of_states):
@@ -117,10 +141,36 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False):
 
         return solution, energy
 
+    def MaxCut_classical_solver_weighted():
+
+        edges_weights = nx.get_edge_attributes(Graph, "weight")
+        num_of_states = 2 ** N
+        state_arr = np.array(['0' * N])
+        for k in range(num_of_states):
+            for j in range(N):
+                if (k < 2 ** (j + 1)) and (k >= 2 ** j):
+                    state_arr = np.append(state_arr, f"{'0' * (N - j - 1)}{format(k, 'b')}")
+
+        cut_arr = np.array([])
+        for state in state_arr:
+            cut = 0
+            for k, j in Graph.edges():
+                if state[k] != state[j]:
+                    cut += edges_weights[(k, j)]
+            cut_arr = np.append(cut_arr, cut)
+
+        solution = state_arr[np.where(cut_arr == np.min(cut_arr))[0]]
+        energy = cut_arr[np.argmin(cut_arr)]
+
+        return solution, energy
+
     N = nx.number_of_nodes(Graph)
     N_e = nx.number_of_edges(Graph)
 
-    Hamiltonian = Hamiltonian()
+    if weighted:
+        Hamiltonian = Hamiltonian_weighted()
+    else:
+        Hamiltonian = Hamiltonian_unweighted()
     Mix_operator_preset = Mix_operator_preset()
     Superposition = (np.ones(2**(N-1)) / (np.sqrt(2)**N))
     global Iterator
@@ -137,7 +187,10 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False):
     Solution, Probability = Solution(F_state)
 
     Start_time = time.time()
-    C_solution, C_energy = MaxCut_clasical_solver()
+    if weighted:
+        C_solution, C_energy = MaxCut_classical_solver_weighted()
+    else:
+        C_solution, C_energy = MaxCut_classical_solver_unweighted()
     End_time = time.time()
     Processing_time_Cl = End_time - Start_time
 
