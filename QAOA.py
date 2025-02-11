@@ -175,6 +175,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
     Superposition = (np.ones(2**(N-1)) / (np.sqrt(2)**N))
     global Iterator
     Iterator = 0
+    Result = 0
 
     Start_time = time.time()
     Init_params = np.ones(2 * P_param)
@@ -198,17 +199,20 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
         print("\033[37m {}".format(f"--------------------------"))
         if Solution[0] in C_solution:
             print("\033[32m {}".format("***SUCCESS***"))
-            result = 1
+            Result = 1
         else:
             print("\033[31m {}".format("***FAIL***"))
-            result = 0
+            Result = 0
         print(f"Number of nodes : {N}  P_param : {P_param}")
         print(f"Iterations : {Iterator}")
         print(f"QAOA solution : {Solution[0]}   Probability : {Probability}   Energy : {np.real(Energy)}")
         print(f"Classical solution : {C_solution}   Energy : {C_energy}")
         print(f"QAOA time : {Processing_time_QAOA} s   Classic time : {Processing_time_Cl} s")
 
-    return (Solution, Probability, np.real(Energy), C_solution, C_energy, Iterator,
+    return (Result, Solution, Probability, np.real(Energy), C_solution, C_energy, Iterator,
             Processing_time_QAOA, Processing_time_Cl)
 
+
+G = generate_graph(6, 0.75, weighted=True, visualise=True)
+QAOA(Graph=G, P_param=20, callback=True, weighted=True, max_iter=20000)
 
