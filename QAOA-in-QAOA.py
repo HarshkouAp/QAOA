@@ -1,5 +1,6 @@
-from Graph_generator import *
+from Graph_generator import generate_graph
 from QAOA import QAOA
+import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -11,8 +12,8 @@ warnings.filterwarnings('ignore')
 
 def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callback=False):
 
-
     def Get_connected_subgraphs(max_size):
+
         global Layer, Graph_division, Graph_nodes
 
         connected_components = list(nx.connected_components(graph))
@@ -69,7 +70,6 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
         Graph_nodes[Layer] = layer_nodes
         Layer += 1
 
-
     def Subgraph_solution(layer):
         solution_dict = {}
         sub = Graph_division[layer]
@@ -97,7 +97,6 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
 
         Sub_solution[layer] = solution_dict
 
-
     def Weights(layer):
         sub_edges = Graph_division[layer]
         sub_nodes = Graph_nodes[layer - 1]
@@ -117,7 +116,6 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
 
                 Graph_division[layer][node][sub_edges[node].index((k, j))] += (weight,)
 
-
     def Recursion(max_size):
         while 1:
             Get_connected_subgraphs(max_size)
@@ -133,7 +131,6 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
             else:
                 Subgraph_solution(layer)
 
-
     def Reformulate_solution():
         for layer in list(Sub_solution.keys())[-1:0:-1]:
             for node in Sub_solution[layer].keys():
@@ -142,7 +139,6 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
                     if sub[ind] == "1":
                         subnodes = Graph_nodes[layer][node]
                         Sub_solution[layer - 1][subnodes[ind]] = Invert(Sub_solution[layer - 1][subnodes[ind]])
-
 
     def Invert(solution):
         inv_solution = ""
@@ -153,7 +149,6 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
                 inv_solution += "1"
 
         return inv_solution
-
 
     def Answer():
         ans = []
@@ -173,14 +168,12 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
 
         return ans
 
-
     def Classical_solution(state):
         cut = 0
         for k, j in A.edges():
             if state[k] != state[j]:
                 cut += 1
         return cut
-
 
     A = graph.copy()
     A_conections = list(A.edges())
