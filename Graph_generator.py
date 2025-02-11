@@ -65,3 +65,4 @@ def generate_graph(number_of_nodes, density, weighted=False, seed='random', visu
 
 
 generate_graph(10, 0.6, weighted=True, visualise=True)
+
