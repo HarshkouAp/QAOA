@@ -10,7 +10,7 @@ warnings.filterwarnings('ignore')
 
 
 
-def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callback=False):
+def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callback=False, logs=True):
 
     def Get_connected_subgraphs(max_size):
 
@@ -71,29 +71,43 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
         Layer += 1
 
     def Subgraph_solution(layer):
+
+        global Q_energy, C_energy
+
         solution_dict = {}
         sub = Graph_division[layer]
 
         if layer == 0:
             for node in sub.keys():
+                if logs:
+                    print("\033[37m {}".format(f"------------------------------"))
+                    print(f"Layer : {layer}    Node : {node}")
                 H = nx.Graph()
                 H.add_edges_from(sub[node])
                 old_nodes = list(H.nodes())
                 new_nodes = list(range(len(old_nodes)))
                 mapping = dict(zip(old_nodes, new_nodes))
                 H = nx.relabel_nodes(H, mapping)
-                R, S, P, E, C_s, C_e, Pt_Q, Pt_C = QAOA(H, depth, max_iter=max_iter)
+                R, S, P, E, C_s, C_e, Pt_Q, Pt_C = QAOA(H, depth, max_iter=max_iter, logs=logs, callback=logs)
                 solution_dict[node] = S[0]
+                Q_energy += E
+                C_energy -= C_e
+
         else:
             for node in sub.keys():
+                if logs:
+                    print("\033[37m {}".format(f"------------------------------"))
+                    print(f"Layer : {layer}    Node : {node}")
                 H = nx.Graph()
                 H.add_weighted_edges_from(sub[node])
                 old_nodes = list(H.nodes())
                 new_nodes = list(range(len(old_nodes)))
                 mapping = dict(zip(old_nodes, new_nodes))
                 H = nx.relabel_nodes(H, mapping)
-                R, S, P, E, C_s, C_e, Pt_Q, Pt_C = QAOA(H, depth, weighted=True, max_iter=max_iter)
+                R, S, P, E, C_s, C_e, Pt_Q, Pt_C = QAOA(H, depth, weighted=True, max_iter=max_iter, logs=logs, callback=logs)
                 solution_dict[node] = S[0]
+                Q_energy += E
+                C_energy -= C_e
 
         Sub_solution[layer] = solution_dict
 
@@ -175,47 +189,59 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
                 cut += 1
         return cut
 
-    A = graph.copy()
-    A_conections = list(A.edges())
 
-    global Graph_division, Graph_nodes, Sub_solution, Layer
-    Layer = 0
-    Graph_division = {}
-    Graph_nodes = {}
-    Sub_solution = {}
+    try:
 
-    Recursion(subgraphsize)
-    Reformulate_solution()
-    QAOA_ans = Answer()
-    QAOA_energy = Classical_solution(QAOA_ans)
+        A = graph.copy()
+        A_conections = list(A.edges())
 
-    if visualise:
+        global Graph_division, Graph_nodes, Sub_solution, Layer, Q_energy, C_energy
+        Layer = 0
+        Q_energy = 0
+        C_energy = 0
+        Graph_division = {}
+        Graph_nodes = {}
+        Sub_solution = {}
 
-        M = nx.Graph()
-        M.add_weighted_edges_from(Graph_division[1]["F"])
-        options = {'node_size': 1000, 'width': 1}
-        nx.draw(M, nx.circular_layout(M), with_labels=False, **options)
-        nx.draw_networkx_edges(M, nx.circular_layout(M), edgelist=M.edges(), width=1)
-        edge_labels = nx.get_edge_attributes(M, "weight")
-        nx.draw_networkx_edge_labels(M, nx.circular_layout(M), edge_labels, font_size=16)
-        # print(dict(zip(range(len(Graph_nodes[1]["F"])), Graph_nodes[1]["F"])))
-        node_lab = dict(zip(Graph_nodes[1]["F"], Graph_nodes[1]["F"]))
-        nx.draw_networkx_labels(M, nx.circular_layout(M), node_lab, font_size=16, font_color="white")
+        Recursion(subgraphsize)
+        Reformulate_solution()
+        QAOA_ans = Answer()
+        Classic_energy = Classical_solution(QAOA_ans)
 
-        ax = plt.gca()
-        ax.margins(0.08)
-        plt.axis("off")
-        plt.show()
+        if visualise:
 
-    if callback:
+            M = nx.Graph()
+            M.add_weighted_edges_from(Graph_division[1]["F"])
+            options = {'node_size': 1000, 'width': 1}
+            nx.draw(M, nx.circular_layout(M), with_labels=False, **options)
+            nx.draw_networkx_edges(M, nx.circular_layout(M), edgelist=M.edges(), width=1)
+            edge_labels = nx.get_edge_attributes(M, "weight")
+            nx.draw_networkx_edge_labels(M, nx.circular_layout(M), edge_labels, font_size=16)
+            # print(dict(zip(range(len(Graph_nodes[1]["F"])), Graph_nodes[1]["F"])))
+            node_lab = dict(zip(Graph_nodes[1]["F"], Graph_nodes[1]["F"]))
+            nx.draw_networkx_labels(M, nx.circular_layout(M), node_lab, font_size=16, font_color="white")
 
-        print("-------------------------------------")
-        print(f"N_nodes : {20}   seed : random   max_size : {6}")
-        print(f"Energy : {QAOA_energy}")
+            ax = plt.gca()
+            ax.margins(0.08)
+            plt.axis("off")
+            plt.show()
 
+        if callback:
 
-# G = generate_graph(20, 0.5, visualise=True)
-# QAOA2(G, 5, 10, callback=True, visualise=True)
+            print("\033[37m {}".format(f"------------------------------"))
+            print(f"N_nodes : {20}   seed : random   max_size : {6}")
+            print(f"Number of reductions : {len(list(Graph_division.keys()).copy()) - 1}")
+            print(f"QAOA energy : {Q_energy}")
+            print(f"Cumulative energy : {C_energy}")
+            print(f"Classic energy ^ {Classic_energy}")
+
+    except Exception:
+
+        print("\033[31m {}".format("Something went wrong!!!"))
+        print("The uncorrected graph")
+
+G = generate_graph(20, 0.5, visualise=True)
+QAOA2(G, 5, 10, callback=True, visualise=True, logs=True)
 
 
 
