@@ -5,7 +5,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
+def QAOA(graph, p_param, max_iter=10000, callback=False, weighted=False, logs=False):
 
     def Mix_operator_preset():
         X = np.array([[0, 1], [1, 0]])
@@ -36,7 +36,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
             for k in range(j, N):
                 if j != k:
                     arr = []
-                    if j in list(nx.all_neighbors(Graph, k)):
+                    if j in list(nx.all_neighbors(graph, k)):
                         for h in range(N):
                             if (h == j) or (h == k):
                                 arr.append("Z")
@@ -51,7 +51,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
         return hamiltonian * (-1)
 
     def Hamiltonian_weighted():
-        edges_weights = nx.get_edge_attributes(Graph, "weight")
+        edges_weights = nx.get_edge_attributes(graph, "weight")
         I_arr = np.ones(2 ** N)
         Z_pauli = np.array([1, -1])
         ZZ_operator = np.zeros(2 ** N)
@@ -60,7 +60,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
             for k in range(j, N):
                 if j != k:
                     arr = []
-                    if j in list(nx.all_neighbors(Graph, k)):
+                    if j in list(nx.all_neighbors(graph, k)):
                         for h in range(N):
                             if (h == j) or (h == k):
                                 arr.append("Z")
@@ -97,14 +97,14 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
         energy = 0
         optimal_angles = 0
         init_params = np.ones(2)
-        for p in range(1, P_param + 1):
+        for p in range(1, p_param + 1):
             function = Cost_function(p)
             result_min = minimize(function, init_params, method='L-BFGS-B', options={'maxiter': max_iter})
             optimal_angles = result_min.x
             init_params = np.insert(optimal_angles, round(len(optimal_angles) / 2), 1)
             init_params = np.append(init_params, 1)
             state, energy = Final_state(p, optimal_angles)
-            if callback:
+            if logs:
                 print(f"Глубина : {p}, Энергия : {energy}")
 
         return state, energy
@@ -148,7 +148,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
         cut_arr = np.array([])
         for state in state_arr:
             cut = 0
-            for k, j in Graph.edges():
+            for k, j in graph.edges():
                 if state[k] != state[j]:
                     cut -= 1
             cut_arr = np.append(cut_arr, cut)
@@ -160,7 +160,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
 
     def MaxCut_classical_solver_weighted():
 
-        edges_weights = nx.get_edge_attributes(Graph, "weight")
+        edges_weights = nx.get_edge_attributes(graph, "weight")
         num_of_states = 2 ** N
         state_arr = np.array(['0' * N])
         for k in range(num_of_states):
@@ -171,7 +171,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
         cut_arr = np.array([])
         for state in state_arr:
             cut = 0
-            for k, j in Graph.edges():
+            for k, j in graph.edges():
                 if state[k] != state[j]:
                     cut -= edges_weights[(k, j)]
             cut_arr = np.append(cut_arr, cut)
@@ -181,8 +181,8 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
 
         return solution, energy
 
-    N = nx.number_of_nodes(Graph)
-    N_e = nx.number_of_edges(Graph)
+    N = nx.number_of_nodes(graph)
+    N_e = nx.number_of_edges(graph)
 
     if weighted:
         Hamiltonian = Hamiltonian_weighted()
@@ -215,7 +215,7 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
         else:
             print("\033[31m {}".format("***FAIL***"))
             Result = 0
-        print(f"Number of nodes : {N}  P_param : {P_param}")
+        print(f"Number of nodes : {N}  P_param : {p_param}")
         print(f"QAOA solution : {Solution[0]}   Probability : {Probability}   Energy : {Energy}")
         print(f"Classical solution : {C_solution}   Energy : {C_energy}")
         print(f"QAOA time : {Processing_time_QAOA} s   Classic time : {Processing_time_Cl} s")
@@ -225,5 +225,5 @@ def QAOA(Graph, P_param, max_iter=10000, callback=False, weighted=False):
 
 
 # G = generate_graph(8, 0.7, weighted=False, visualise=True)
-# QAOA(Graph=G, P_param=25, callback=True, weighted=False, max_iter=5000)
+# QAOA(graph=G, p_param=10, callback=True, weighted=False, max_iter=5000, logs=True)
 
