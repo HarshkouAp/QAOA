@@ -89,6 +89,7 @@ def grapf_reduction(graph, max_size, visualise=False):
 
     :param graph: Исходный граф (networkx.Graph)
     :param max_size: Максимальный размер подграфа
+    :param visualise: Визуализация свёртки графа
     :return: Три словаря:
              1. reduction_layers - словарь содержащий все связи графа на каждой итерации.
                 (keys = итерация, vals = связи графа)
