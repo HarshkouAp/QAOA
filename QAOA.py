@@ -118,7 +118,7 @@ def QAOA(graph, p_param, max_iter=10000, callback=False, weighted=False, logs=Fa
             for j in range(N):
                 vector = (vector * np.cos(beta[k]) - 1j * vector[Mix_operator_preset[j]] * np.sin(beta[k]))
             state = vector
-        energy = np.abs(2 * np.sum(np.conj(state) * Hamiltonian * state))
+        energy = np.abs(2 * np.sum(np.conj(state) * Hamiltonian * state)) * (-1)
 
         return state, energy
 
@@ -208,7 +208,7 @@ def QAOA(graph, p_param, max_iter=10000, callback=False, weighted=False, logs=Fa
     Processing_time_Cl = End_time - Start_time
 
     if callback:
-        print("\033[37m {}".format(f"--------------------------"))
+        print("\033[37m {}".format(f"-------------------------------------"))
         if Solution[0] in C_solution:
             print("\033[32m {}".format("***SUCCESS***"))
             Result = 1
@@ -224,6 +224,6 @@ def QAOA(graph, p_param, max_iter=10000, callback=False, weighted=False, logs=Fa
             Processing_time_QAOA, Processing_time_Cl)
 
 
-# G = generate_graph(8, 0.7, weighted=False, visualise=True)
+# G = generate_graph(8, 0.7, weighted=False, visualise=False)
 # QAOA(graph=G, p_param=10, callback=True, weighted=False, max_iter=5000, logs=True)
 
