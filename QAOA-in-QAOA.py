@@ -1,160 +1,254 @@
-from Graph_generator import generate_graph
-from QAOA import QAOA
-import matplotlib.pyplot as plt
+import time
+from QAOA import *
+from Graph_cutter import *
 import networkx as nx
-import numpy as np
-import pandas as pd
 import warnings
-
 warnings.filterwarnings('ignore')
 
 
+def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=False, logs=True):
 
-def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callback=False, logs=True):
+    def recursion():
 
-    def Get_connected_subgraphs(max_size):
+        # Добавляем веса в исходный граф
+        reduction_layers[0] = list(map(lambda x: x + (1,), reduction_layers[0]))
 
-        global Layer, Graph_division, Graph_nodes
+        # Добавляем веса в нулевой шаг свёртки
+        for node in reduction_edges[0].keys():
+            reduction_edges[0][node] = list(map(lambda x: x + (1,), reduction_edges[0][node]))
 
-        connected_components = list(nx.connected_components(graph))
-        subgraphs = []
+        for layer in reduction_edges.keys():
 
-        for component in connected_components:
-            g = graph.subgraph(component)
-            nodes = list(g.nodes)
+            # Находим решения для подграфов
+            subgraph_solution(layer)
 
-            visited = set()
-            for i in range(len(nodes)):
-                if nodes[i] in visited:
-                    continue
-                subgraph_nodes = []
-                stack = [nodes[i]]
+            if layer != 0:
+                energy(layer - 1)
+                weights_2(layer - 1)
 
-                while stack and len(subgraph_nodes) < max_size:
-                    node = stack.pop()
-                    if node not in visited:
-                        visited.add(node)
-                        subgraph_nodes.append(node)
-                        for neighbor in g.neighbors(node):
-                            if neighbor not in visited:
-                                stack.append(neighbor)
 
-                if len(subgraph_nodes) > 1:
-                    subgraph = g.subgraph(subgraph_nodes)
-                    subgraphs.append(list(subgraph.edges))
+            if layer != max(reduction_edges.keys()):
+                # Раcчитываем веса связей
+                weights_1(layer)
 
-        iterator = 1
-        node_name = max(list(graph.nodes()))
-        layer_edges = {}
-        layer_nodes = {}
+        reformulate_solution()
+        s = merge_solution()
 
-        for sg in subgraphs:
+        ind_1 = max(list(q_energy_dict.keys()))
+        ind_2 = list(q_energy_dict[ind_1].keys())[0]
+        q_e = q_energy_dict[ind_1][ind_2]
+        c_e = c_energy_dict[ind_1][ind_2]
 
-            H = nx.Graph()
-            H.add_edges_from(sg)
-            graph.add_node(node_name + iterator)
-            layer_edges[node_name + iterator] = list(H.edges())
-            layer_nodes[node_name + iterator] = list(H.nodes())
+        return s, q_e, c_e
 
-            for i in list(H.nodes()):
-                neighbors = list(graph.neighbors(i))
+    def subgraph_solution(layer):
+        solution = {}
+        q_energy = {}
+        c_energy = {}
 
-                for k in neighbors:
-                    if k not in list(H.nodes()):
-                        graph.remove_edge(i, k)
-                        graph.add_edge(k, node_name + iterator)
-                graph.remove_node(i)
-            iterator += 1
+        for node in list(reduction_nodes[layer].keys()):
 
-        Graph_division[Layer] = layer_edges
-        Graph_nodes[Layer] = layer_nodes
-        Layer += 1
+            # Проверка на тривиальный подграф (одна вершина). Ф-ия QAOA не работает с таковыми.
+            if len(reduction_nodes[layer][node]) != 1:
 
-    def Subgraph_solution(layer):
-
-        global Q_energy, C_energy
-
-        solution_dict = {}
-        sub = Graph_division[layer]
-
-        if layer == 0:
-            for node in sub.keys():
                 if logs:
                     print("\033[37m {}".format(f"------------------------------"))
                     print(f"Layer : {layer}    Node : {node}")
-                H = nx.Graph()
-                H.add_edges_from(sub[node])
-                old_nodes = list(H.nodes())
+
+                subgraph = nx.Graph()
+                subgraph.add_nodes_from(reduction_nodes[layer][node])
+                subgraph.add_weighted_edges_from(reduction_edges[layer][node])
+
+                # Для работы ф-ии QAOA необходимо чтобы вершины графа начинали нумероваться с 1
+                old_nodes = list(subgraph.nodes())
                 new_nodes = list(range(len(old_nodes)))
                 mapping = dict(zip(old_nodes, new_nodes))
-                H = nx.relabel_nodes(H, mapping)
-                R, S, P, E, C_s, C_e, Pt_Q, Pt_C = QAOA(H, depth, max_iter=max_iter, logs=logs, callback=logs)
-                solution_dict[node] = S[0]
-                Q_energy += E
-                C_energy -= C_e
+                subgraph = nx.relabel_nodes(subgraph, mapping)
 
-        else:
-            for node in sub.keys():
-                if logs:
-                    print("\033[37m {}".format(f"------------------------------"))
-                    print(f"Layer : {layer}    Node : {node}")
-                H = nx.Graph()
-                H.add_weighted_edges_from(sub[node])
-                old_nodes = list(H.nodes())
-                new_nodes = list(range(len(old_nodes)))
-                mapping = dict(zip(old_nodes, new_nodes))
-                H = nx.relabel_nodes(H, mapping)
-                R, S, P, E, C_s, C_e, Pt_Q, Pt_C = QAOA(H, depth, weighted=True, max_iter=max_iter, logs=logs, callback=logs)
-                solution_dict[node] = S[0]
-                Q_energy += E
-                C_energy -= C_e
+                r, s, p, e, c_s, c_e, pt_q, pt_c = QAOA(subgraph, depth, weighted=True, max_iter=max_iter, logs=logs, callback=logs)
+                solution[node] = s[0]
+                q_energy[node] = e * (-1)
+                c_energy[node] = c_e * (-1)
 
-        Sub_solution[layer] = solution_dict
-
-    def Weights(layer):
-        sub_edges = Graph_division[layer]
-        sub_nodes = Graph_nodes[layer - 1]
-
-        for node in sub_edges.keys():
-            for k, j in sub_edges[node]:
-                weight = 0
-                k_solution = Sub_solution[layer - 1][k]
-                j_solution = Sub_solution[layer - 1][j]
-
-                for k_node, j_node in zip(sub_nodes[k], sub_nodes[j]):
-                    if (k_node, j_node) in A_conections:
-                        if k_solution[sub_nodes[k].index(k_node)] == j_solution[sub_nodes[j].index(j_node)]:
-                            weight += 1
-                        else:
-                            weight -= 1
-
-                Graph_division[layer][node][sub_edges[node].index((k, j))] += (weight,)
-
-    def Recursion(max_size):
-        while 1:
-            Get_connected_subgraphs(max_size)
-            if len(graph.nodes()) <= max_size:
-                Graph_division[Layer] = {"F": list(graph.edges())}
-                Graph_nodes[Layer] = {"F": list(graph.nodes())}
-                break
-
-        for layer in Graph_division.keys():
-            if layer != max(Graph_division.keys()):
-                Subgraph_solution(layer)
-                Weights(layer + 1)
             else:
-                Subgraph_solution(layer)
+                solution[node] = "1"
+                q_energy[node] = 0
+                c_energy[node] = 0
 
-    def Reformulate_solution():
-        for layer in list(Sub_solution.keys())[-1:0:-1]:
-            for node in Sub_solution[layer].keys():
-                sub = Sub_solution[layer][node]
-                for ind in range(len(sub)):
-                    if sub[ind] == "1":
-                        subnodes = Graph_nodes[layer][node]
-                        Sub_solution[layer - 1][subnodes[ind]] = Invert(Sub_solution[layer - 1][subnodes[ind]])
+        solution_dict[layer] = solution
+        q_energy_dict[layer] = q_energy
+        c_energy_dict[layer] = c_energy
 
-    def Invert(solution):
+    def weights_1(layer):
+
+        edges = reduction_edges[layer + 1]
+        nodes = reduction_nodes[layer]
+        connections = reduction_layers[layer]
+        solutions = solution_dict[layer]
+
+        # Сначала добавим веса к reduction_edges[layer + 1]
+
+        # перебираем все не взвешенные подграфы на данном шаге разбиения
+        for subgraph in edges.keys():
+            # перебираем все не взвешенные связи между вершинами k и j в конкретном подграфе
+            for k, j in edges[subgraph]:
+                # Создаём два списка с вершинами которые входят в состав вершин k и j
+                k_nodes = nodes[k]
+                j_nodes = nodes[j]
+                # Создаём два списка с решениями для k, j
+                k_sol = solutions[k]
+                j_sol = solutions[j]
+                weight = 0
+                # Проверяем наличие связи между вершинами x из k_nodes и y из j_nodes
+                for x in k_nodes:
+                    for y in j_nodes:
+                        # пробегаем все связи с предыдущего шага
+                        for m, n, w in connections:
+                            if (x == m and y == n) or (x == n and y == m):
+                                # проверяем какой бит решения соответствует x и y
+                                if k_sol[k_nodes.index(x)] == j_sol[j_nodes.index(y)]:
+                                    # Если x и y в одном классе увеличиваем вес на значение веса связи
+                                    weight += w
+
+                                else:
+                                    # Если x и y в разных классах, то уменьшаем вес на значение веса связи
+                                    weight -= w
+
+                # Добавляем рассчитанный вес к ребру
+                reduction_edges[layer + 1][subgraph][edges[subgraph].index((k, j))] = (k, j, weight)
+
+    def weights_2(layer):
+
+        pre_edges = reduction_layers[layer]
+        edges = reduction_layers[layer + 1]
+
+        pre_sols = solution_dict[layer]
+        sols = solution_dict[layer + 1]
+
+        pre_nodes = reduction_nodes[layer]
+        nodes = reduction_nodes[layer + 1]
+
+        # Перебираем все связи
+        for ind in range(len(edges)):
+            k, j = edges[ind]
+            k_bit = "."
+            j_bit = "."
+            iterator = 0
+
+            # Ищем бит для k и j
+            for node in nodes.keys():
+                if k in nodes[node]:
+                    k_bit = sols[node][nodes[node].index(k)]
+                    iterator += 1
+                if j in nodes[node]:
+                    j_bit = sols[node][nodes[node].index(j)]
+                    iterator += 1
+                if iterator == 2:
+                    pass
+
+            k_nodes = pre_nodes[k]
+            j_nodes = pre_nodes[j]
+            k_sols = pre_sols[k]
+            j_sols = pre_sols[j]
+            weight = 0
+
+            for x in k_nodes:
+                x_bit = k_sols[k_nodes.index(x)]
+                for y in j_nodes:
+                    y_bit = j_sols[j_nodes.index(y)]
+
+                    for n, m, w in pre_edges:
+                        if (n == x and m == y) or (n == y and m == x):
+
+                            if k_bit == j_bit:
+                                if x_bit != y_bit:
+                                    weight += w
+
+                            else:
+                                if x_bit == y_bit:
+                                    weight += w
+
+
+            reduction_layers[layer + 1][ind] += (weight,)
+
+    def energy(layer):
+
+        pre_sol = solution_dict[layer]
+        sols = solution_dict[layer + 1]
+
+        pre_q_e = q_energy_dict[layer]
+        pre_c_e = c_energy_dict[layer]
+
+        connections = reduction_layers[layer]
+        edges = reduction_edges[layer + 1]
+        pre_nodes = reduction_nodes[layer]
+        nodes = reduction_nodes[layer + 1]
+
+        q_e_dict = {}
+        c_e_dict = {}
+
+        # перебираем все подграфы на данном шаге разбиения
+        for subgraph in edges.keys():
+
+            q_e_dict[subgraph] = 0
+            c_e_dict[subgraph] = 0
+            sub_nodes = nodes[subgraph]
+
+            # Рассчитываем сумму энергий подграфов с предыдущего слоя sum(C(x_i))
+            for node in sub_nodes:
+                q_e_dict[subgraph] += pre_q_e[node]
+                c_e_dict[subgraph] += pre_c_e[node]
+
+            # Рассчитаем величину w_ij = sum(x_iu * x_jv * W_iu_jv)
+            sub_sol = sols[subgraph]
+
+            # Перебираем все существующие связи между подграфами
+            for k, j, l in edges[subgraph]:
+
+                k_bit = sub_sol[sub_nodes.index(k)]
+                j_bit = sub_sol[sub_nodes.index(j)]
+
+                k_nodes = pre_nodes[k]
+                j_nodes = pre_nodes[j]
+                k_sol = pre_sol[k]
+                j_sol = pre_sol[j]
+
+                for x in k_nodes:
+                    x_bit = k_sol[k_nodes.index(x)]
+                    for y in j_nodes:
+                        y_bit = j_sol[j_nodes.index(y)]
+                        # пробегаем все связи с предыдущего шага
+                        for m, n, w in connections:
+                            if (x == m and y == n) or (x == n and y == m):
+                                if k_bit == j_bit:
+                                    # проверяем какой бит решения соответствует x и y
+                                    if x_bit != y_bit:
+                                        # Если x и y в одном классе увеличиваем вес на значение веса связи
+                                        q_e_dict[subgraph] += w
+                                        c_e_dict[subgraph] += w
+                                else:
+                                    if x_bit == y_bit:
+                                        # Если x и y в одном классе увеличиваем вес на значение веса связи
+                                        q_e_dict[subgraph] += w
+                                        c_e_dict[subgraph] += w
+
+        q_energy_dict[layer + 1] = q_e_dict
+        c_energy_dict[layer + 1] = c_e_dict
+
+    def reformulate_solution():
+        layers = list(reduction_layers.keys())[:0:-1]
+        for l in layers:
+            solutions = solution_dict[l]
+            nodes = reduction_nodes[l]
+            for node in nodes.keys():
+                sol = solutions[node]
+                sub_nodes = nodes[node]
+
+                for i in range(len(sol)):
+                    if sol[i] == "1":
+                        solution_dict[l - 1][sub_nodes[i]] = invert(solution_dict[l - 1][sub_nodes[i]])
+
+    def invert(solution):
         inv_solution = ""
         for i in solution:
             if i == "1":
@@ -164,92 +258,60 @@ def QAOA2(graph, subgraphsize, depth=10, max_iter=10000, visualise=False, callba
 
         return inv_solution
 
-    def Answer():
-        ans = []
+    def merge_solution():
+        sol_dict = {}
+        solution = ""
+        nodes = solution_dict[0].keys()
+        for node in nodes:
+            sub_nodes = reduction_nodes[0][node]
+            sub_sol = solution_dict[0][node]
+            for i in sub_nodes:
+                sol_dict[i] = sub_sol[sub_nodes.index(i)]
 
-        for node in Sub_solution[0]:
-            for ind in range(len(Sub_solution[0][node])):
-                ans.append([Graph_nodes[0][node][ind], Sub_solution[0][node][ind]])
+        for i in range(max(list(sol_dict.keys())) + 1):
+            solution += sol_dict[i]
 
-        ans = np.array(ans)
-        Df = pd.DataFrame(ans, columns=["node", "solution"])
-        Df["node"] = Df["node"].apply(lambda x: int(x))
-        Df.sort_values("node", inplace=True)
+        return solution
 
-        ans = ""
-        for i in Df["solution"]:
-            ans += i
-
-        return ans
-
-    def Classical_solution(state):
+    def classical_solution(state):
         cut = 0
-        for k, j in A.edges():
+        for k, j, w in reduction_layers[0]:
             if state[k] != state[j]:
                 cut += 1
         return cut
 
+    N_nodes = nx.number_of_nodes(graph)
+    N_edges = nx.number_of_edges(graph)
 
-    try:
+    # Строим разбиение и свёртку графа
+    s = time.time()
+    global reduction_layers, reduction_edges, reduction_nodes
+    reduction_layers, reduction_edges, reduction_nodes = grapf_reduction(graph, max_size, visualise=False)
+    gp_t = time.time() - s
 
-        A = graph.copy()
-        A_conections = list(A.edges())
+    # Создаём словари для сбора промежуточных результатов
+    global solution_dict, q_energy_dict, c_energy_dict
+    solution_dict = {}
+    q_energy_dict = {}
+    c_energy_dict = {}
 
-        global Graph_division, Graph_nodes, Sub_solution, Layer, Q_energy, C_energy
-        Layer = 0
-        Q_energy = 0
-        C_energy = 0
-        Graph_division = {}
-        Graph_nodes = {}
-        Sub_solution = {}
+    s = time.time()
+    solution, q_energy, c_energy = recursion()
+    r_t = time.time() - s
 
-        Recursion(subgraphsize)
-        Reformulate_solution()
-        QAOA_ans = Answer()
-        Classic_energy = Classical_solution(QAOA_ans)
+    c_s = classical_solution(solution)
 
-        if visualise:
+    if callback:
 
-            M = nx.Graph()
-            M.add_weighted_edges_from(Graph_division[1]["F"])
-            options = {'node_size': 1000, 'width': 1}
-            nx.draw(M, nx.circular_layout(M), with_labels=False, **options)
-            nx.draw_networkx_edges(M, nx.circular_layout(M), edgelist=M.edges(), width=1)
-            edge_labels = nx.get_edge_attributes(M, "weight")
-            nx.draw_networkx_edge_labels(M, nx.circular_layout(M), edge_labels, font_size=16)
-            # print(dict(zip(range(len(Graph_nodes[1]["F"])), Graph_nodes[1]["F"])))
-            node_lab = dict(zip(Graph_nodes[1]["F"], Graph_nodes[1]["F"]))
-            nx.draw_networkx_labels(M, nx.circular_layout(M), node_lab, font_size=16, font_color="white")
+        print("\033[33m {}".format(f"====================================="))
+        print(f"Subgraph size : {max_size}   Depth : {depth}   Max iter : {max_iter}")
+        print(f"Number of nodes : {N_nodes}   Number of edges : {N_edges}")
+        print(f"QAOA2  ::  Q_energy : {round(q_energy, 6)}   C_energy : {c_energy}")
+        print(f"Classical energy for QAOA2 state: {c_s}")
+        print(f"Graph partition time : {round(gp_t, 9)}   Recursion time : {round(r_t, 9)}")
+        print("\033[33m {}".format(f"====================================="))
 
-            ax = plt.gca()
-            ax.margins(0.08)
-            plt.axis("off")
-            plt.show()
+    return solution, q_energy, c_energy, c_s
 
-        if callback:
-
-            print("\033[37m {}".format(f"------------------------------"))
-            print(f"N_nodes : {20}   seed : random   max_size : {6}")
-            print(f"Number of reductions : {len(list(Graph_division.keys()).copy()) - 1}")
-            print(f"QAOA energy : {Q_energy}")
-            print(f"Cumulative energy : {C_energy}")
-            print(f"Classic energy ^ {Classic_energy}")
-
-    except Exception:
-
-        print("\033[31m {}".format("Something went wrong!!!"))
-        print("The uncorrected graph")
-
-G = generate_graph(20, 0.5, visualise=True)
-QAOA2(G, 5, 10, callback=True, visualise=True, logs=True)
-
-
-
-
-
-
-
-
-
-
-
+# G = generate_graph(20, 0.7, visualise=False)
+# Sol, Q_e, C_e, C_s = QAOA2(G, 5, 5, callback=True, visualise=False, logs=True)
