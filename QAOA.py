@@ -305,6 +305,7 @@ def QAOA(graph, p_param, max_iter=10000, callback=False, weighted=False, logs=Fa
             result = 0
         print(f"Number of nodes : {n_nodes}  P_param : {p_param}")
         print(f"QAOA solution : {solution[0]}   probability : {probability}   energy : {energy}")
+        print(f"Optimization strategy : {strategy}   Method : {method}")
         print(f"Classical solution : {c_solution}   energy : {c_energy}")
         print(f"QAOA time : {processing_time_qaoa} s   Classic time : {processing_time_cl} s")
 
@@ -312,6 +313,6 @@ def QAOA(graph, p_param, max_iter=10000, callback=False, weighted=False, logs=Fa
             processing_time_qaoa, processing_time_cl)
 
 
-G = generate_graph(8, 0.7, weighted=False, visualise=False)
-QAOA(graph=G, p_param=10, callback=True, weighted=False, max_iter=5000, logs=True, strategy="consistent")
+# G = generate_graph(8, 0.7, weighted=False, visualise=False)
+# QAOA(graph=G, p_param=10, callback=True, weighted=False, max_iter=5000, logs=True, strategy="consistent")
 
