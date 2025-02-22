@@ -11,11 +11,13 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
     def recursion():
 
         # Добавляем веса в исходный граф
-        reduction_layers[0] = list(map(lambda x: x + (1,), reduction_layers[0]))
+        # (node_k, node_j, similar_sol, different_sol)
+        reduction_layers[0] = list(map(lambda x: x + (1, 0,), reduction_layers[0]))
 
         # Добавляем веса в нулевой шаг свёртки
+        # (node_k, node_j, similar_sol, different_sol)
         for node in reduction_edges[0].keys():
-            reduction_edges[0][node] = list(map(lambda x: x + (1,), reduction_edges[0][node]))
+            reduction_edges[0][node] = list(map(lambda x: x + (1, 0,), reduction_edges[0][node]))
 
         for layer in reduction_edges.keys():
 
@@ -24,12 +26,10 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
 
             if layer != 0:
                 energy(layer - 1)
-                weights_2(layer - 1)
-
 
             if layer != max(reduction_edges.keys()):
                 # Раcчитываем веса связей
-                weights_1(layer)
+                weights(layer)
 
         reformulate_solution()
         s = merge_solution()
@@ -57,7 +57,8 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
 
                 subgraph = nx.Graph()
                 subgraph.add_nodes_from(reduction_nodes[layer][node])
-                subgraph.add_weighted_edges_from(reduction_edges[layer][node])
+                for k, j, s, d in reduction_edges[layer][node]:
+                    subgraph.add_edge(k, j, weight=(s - d))
 
                 # Для работы ф-ии QAOA необходимо чтобы вершины графа начинали нумероваться с 1
                 old_nodes = list(subgraph.nodes())
@@ -79,7 +80,7 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
         q_energy_dict[layer] = q_energy
         c_energy_dict[layer] = c_energy
 
-    def weights_1(layer):
+    def weights(layer):
 
         edges = reduction_edges[layer + 1]
         nodes = reduction_nodes[layer]
@@ -98,78 +99,62 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
                 # Создаём два списка с решениями для k, j
                 k_sol = solutions[k]
                 j_sol = solutions[j]
-                weight = 0
+
+                similar = 0
+                different = 0
                 # Проверяем наличие связи между вершинами x из k_nodes и y из j_nodes
                 for x in k_nodes:
+                    x_bit = k_sol[k_nodes.index(x)]
                     for y in j_nodes:
+                        y_bit = j_sol[j_nodes.index(y)]
                         # пробегаем все связи с предыдущего шага
-                        for m, n, w in connections:
+                        for m, n, s, d in connections:
                             if (x == m and y == n) or (x == n and y == m):
                                 # проверяем какой бит решения соответствует x и y
-                                if k_sol[k_nodes.index(x)] == j_sol[j_nodes.index(y)]:
+                                if  x_bit == y_bit:
                                     # Если x и y в одном классе увеличиваем вес на значение веса связи
-                                    weight += w
-
+                                    similar += s
+                                    different += d
                                 else:
                                     # Если x и y в разных классах, то уменьшаем вес на значение веса связи
-                                    weight -= w
+                                    similar += d
+                                    different += s
 
                 # Добавляем рассчитанный вес к ребру
-                reduction_edges[layer + 1][subgraph][edges[subgraph].index((k, j))] = (k, j, weight)
+                reduction_edges[layer + 1][subgraph][edges[subgraph].index((k, j))] = (k, j, similar, different)
 
-    def weights_2(layer):
-
-        pre_edges = reduction_layers[layer]
         edges = reduction_layers[layer + 1]
 
-        pre_sols = solution_dict[layer]
-        sols = solution_dict[layer + 1]
+        for k, j in edges:
+            # Создаём два списка с вершинами которые входят в состав вершин k и j
+            k_nodes = nodes[k]
+            j_nodes = nodes[j]
+            # Создаём два списка с решениями для k, j
+            k_sol = solutions[k]
+            j_sol = solutions[j]
 
-        pre_nodes = reduction_nodes[layer]
-        nodes = reduction_nodes[layer + 1]
-
-        # Перебираем все связи
-        for ind in range(len(edges)):
-            k, j = edges[ind]
-            k_bit = "."
-            j_bit = "."
-            iterator = 0
-
-            # Ищем бит для k и j
-            for node in nodes.keys():
-                if k in nodes[node]:
-                    k_bit = sols[node][nodes[node].index(k)]
-                    iterator += 1
-                if j in nodes[node]:
-                    j_bit = sols[node][nodes[node].index(j)]
-                    iterator += 1
-                if iterator == 2:
-                    pass
-
-            k_nodes = pre_nodes[k]
-            j_nodes = pre_nodes[j]
-            k_sols = pre_sols[k]
-            j_sols = pre_sols[j]
-            weight = 0
-
+            similar = 0
+            different = 0
+            # Проверяем наличие связи между вершинами x из k_nodes и y из j_nodes
             for x in k_nodes:
-                x_bit = k_sols[k_nodes.index(x)]
+                x_bit = k_sol[k_nodes.index(x)]
                 for y in j_nodes:
-                    y_bit = j_sols[j_nodes.index(y)]
-
-                    for n, m, w in pre_edges:
-                        if (n == x and m == y) or (n == y and m == x):
-
-                            if k_bit == j_bit:
-                                if x_bit != y_bit:
-                                    weight += w
-
+                    y_bit = j_sol[j_nodes.index(y)]
+                    # пробегаем все связи с предыдущего шага
+                    for m, n, s, d in connections:
+                        if (x == m and y == n) or (x == n and y == m):
+                            # проверяем какой бит решения соответствует x и y
+                            if x_bit == y_bit:
+                                # Если x и y в одном классе увеличиваем вес на значение веса связи
+                                similar += s
+                                different += d
                             else:
-                                if x_bit == y_bit:
-                                    weight += w
+                                # Если x и y в разных классах, то уменьшаем вес на значение веса связи
+                                similar += d
+                                different += s
 
-
-            reduction_layers[layer + 1][ind] += (weight,)
+            # Добавляем рассчитанный вес к ребру
+            reduction_layers[layer + 1][edges.index((k, j))] = (k, j, similar, different)
 
     def energy(layer):
 
@@ -203,7 +188,7 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
             sub_sol = sols[subgraph]
 
             # Перебираем все существующие связи между подграфами
-            for k, j, l in edges[subgraph]:
+            for k, j, s, d in edges[subgraph]:
 
                 k_bit = sub_sol[sub_nodes.index(k)]
                 j_bit = sub_sol[sub_nodes.index(j)]
@@ -218,19 +203,26 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
                     for y in j_nodes:
                         y_bit = j_sol[j_nodes.index(y)]
                         # пробегаем все связи с предыдущего шага
-                        for m, n, w in connections:
+                        for m, n, pre_s, pre_d in connections:
                             if (x == m and y == n) or (x == n and y == m):
                                 if k_bit == j_bit:
                                     # проверяем какой бит решения соответствует x и y
-                                    if x_bit != y_bit:
+                                    if x_bit == y_bit:
                                         # Если x и y в одном классе увеличиваем вес на значение веса связи
-                                        q_e_dict[subgraph] += w
-                                        c_e_dict[subgraph] += w
+                                        q_e_dict[subgraph] += pre_d
+                                        c_e_dict[subgraph] += pre_d
+                                    else:
+                                        q_e_dict[subgraph] += pre_s
+                                        c_e_dict[subgraph] += pre_s
+
                                 else:
                                     if x_bit == y_bit:
                                         # Если x и y в одном классе увеличиваем вес на значение веса связи
-                                        q_e_dict[subgraph] += w
-                                        c_e_dict[subgraph] += w
+                                        q_e_dict[subgraph] += pre_s
+                                        c_e_dict[subgraph] += pre_s
+                                    else:
+                                        q_e_dict[subgraph] += pre_d
+                                        c_e_dict[subgraph] += pre_d
 
         q_energy_dict[layer + 1] = q_e_dict
         c_energy_dict[layer + 1] = c_e_dict
@@ -275,9 +267,9 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
 
     def classical_solution(state):
         cut = 0
-        for k, j, w in reduction_layers[0]:
+        for k, j, s, d in reduction_layers[0]:
             if state[k] != state[j]:
-                cut += 1
+                cut += s
         return cut
 
     N_nodes = nx.number_of_nodes(graph)
@@ -295,9 +287,9 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
     q_energy_dict = {}
     c_energy_dict = {}
 
-    s = time.time()
+    start = time.time()
     solution, q_energy, c_energy = recursion()
-    r_t = time.time() - s
+    r_t = time.time() - start
 
     c_s = classical_solution(solution)
 
@@ -313,5 +305,5 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
 
     return solution, q_energy, c_energy, c_s
 
-# G = generate_graph(20, 0.7, visualise=False)
-# Sol, Q_e, C_e, C_s = QAOA2(G, 5, 5, callback=True, visualise=False, logs=True)
+G = generate_graph(200, 0.7, visualise=False)
+Sol, Q_e, C_e, C_s = QAOA2(G, 5, 5, callback=True, visualise=False, logs=True)
