@@ -102,8 +102,9 @@ def grapf_reduction(graph, max_size, visualise=False):
     reduction_edges = {}
     reduction_nodes = {}
     reduction_layers = {}
+    copy_graph = graph.copy()
 
-    while len(graph.nodes()) > max_size:
+    while len(graph.nodes()) > 1:
         iterator = 1
         layer_edges = {}
         layer_nodes = {}
@@ -132,6 +133,7 @@ def grapf_reduction(graph, max_size, visualise=False):
         reduction_nodes[layer] = layer_nodes
         layer += 1
 
+
         if visualise:
             options = {'node_size': 1000, 'width': 1}
             nx.draw(graph, nx.circular_layout(graph), with_labels=True, **options)
@@ -144,8 +146,25 @@ def grapf_reduction(graph, max_size, visualise=False):
             plt.axis("off")
             plt.show()
 
+    edge_weights = nx.get_edge_attributes(copy_graph, "weight")
+    # Добавляем веса в исходный граф
+    # (node_k, node_j, similar_sol, different_sol)
+
+    reduction_layers[0] = list(map(lambda x: x + (edge_weights[x], 0,), reduction_layers[0]))
+
+    # Добавляем веса в нулевой шаг свёртки
+    # (node_k, node_j, similar_sol, different_sol)
+    for node in list(reduction_edges[0].keys()):
+        for i in range(len(reduction_edges[0][node])):
+            k, j = reduction_edges[0][node][i]
+            try:
+                reduction_edges[0][node][i] += (edge_weights[(k, j)], 0)
+            except KeyError:
+                reduction_edges[0][node][i] += (edge_weights[(j, k)], 0)
+
+
     return reduction_layers, reduction_edges, reduction_nodes
 
 # # Пример использования
-# G = generate_graph(125, 0.7, visualise=True)  # Пример графа
-# L, E, N = grapf_reduction(G, 5, visualise=True)
+G = generate_graph(125, 0.7, visualise=False)  # Пример графа
+L, E, N = grapf_reduction(G, 5, visualise=False)
