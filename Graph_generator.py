@@ -13,6 +13,9 @@ def generate_graph(number_of_nodes, density, weighted=False, seed='random', visu
         real_density = round(2 * int(number_of_edges) / (number_of_nodes * (number_of_nodes - 1)), 4)
         G = nx.dense_gnm_random_graph(number_of_nodes, int(number_of_edges), seed)
 
+        for k, j in G.edges():
+            nx.set_edge_attributes(G, {(k, j): {"weight": 1}})
+
         if visualise:
 
             plt.figure(figsize=(8, 8))
@@ -64,5 +67,5 @@ def generate_graph(number_of_nodes, density, weighted=False, seed='random', visu
     return G
 
 
-generate_graph(10, 0.6, weighted=True, visualise=True)
+# generate_graph(10, 0.6, weighted=True, visualise=True)
 
