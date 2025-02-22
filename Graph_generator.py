@@ -67,5 +67,6 @@ def generate_graph(number_of_nodes, density, weighted=False, seed='random', visu
     return G
 
 
-# generate_graph(10, 0.6, weighted=True, visualise=True)
+# Gr = generate_graph(10, 0.6, visualise=True)
+# print(nx.get_edge_attributes(Gr, "weight"))
 
