@@ -10,15 +10,6 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
 
     def recursion():
 
-        # Добавляем веса в исходный граф
-        # (node_k, node_j, similar_sol, different_sol)
-        reduction_layers[0] = list(map(lambda x: x + (1, 0,), reduction_layers[0]))
-
-        # Добавляем веса в нулевой шаг свёртки
-        # (node_k, node_j, similar_sol, different_sol)
-        for node in reduction_edges[0].keys():
-            reduction_edges[0][node] = list(map(lambda x: x + (1, 0,), reduction_edges[0][node]))
-
         for layer in reduction_edges.keys():
 
             # Находим решения для подграфов
@@ -318,6 +309,7 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
     N_nodes = nx.number_of_nodes(graph)
     N_edges = nx.number_of_edges(graph)
 
+
     # Строим разбиение и свёртку графа
     s = time.time()
     global reduction_layers, reduction_edges, reduction_nodes
@@ -348,5 +340,5 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
 
     return solution, q_energy, c_energy, c_s
 
-G = generate_graph(1000, 0.7, visualise=False, seed=1000)
+G = generate_graph(100, 0.7, visualise=False, seed=1000)
 Sol, Q_e, C_e, C_s = QAOA2(G, 5, 5, callback=True, visualise=False, logs=True)
