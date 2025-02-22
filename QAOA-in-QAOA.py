@@ -295,6 +295,7 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
 
     if callback:
 
+
         print("\033[33m {}".format(f"====================================="))
         print(f"Subgraph size : {max_size}   Depth : {depth}   Max iter : {max_iter}")
         print(f"Number of nodes : {N_nodes}   Number of edges : {N_edges}")
