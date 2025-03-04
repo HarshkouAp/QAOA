@@ -162,9 +162,8 @@ def grapf_reduction(graph, max_size, visualise=False):
             except KeyError:
                 reduction_edges[0][node][i] += (edge_weights[(j, k)], 0)
 
-
     return reduction_layers, reduction_edges, reduction_nodes
 
 # # Пример использования
-G = generate_graph(125, 0.7, visualise=False)  # Пример графа
-L, E, N = grapf_reduction(G, 5, visualise=False)
+# G = generate_graph(125, 0.7, visualise=False)  # Пример графа
+# L, E, N = grapf_reduction(G, 5, visualise=False)
