@@ -1,12 +1,13 @@
 import time
 from QAOA import *
 from Graph_cutter import *
+from Graph_from_dataset import *
 import networkx as nx
 import warnings
 warnings.filterwarnings('ignore')
 
 
-def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=False, logs=True):
+def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=False, logs=False):
 
     def recursion():
 
@@ -95,9 +96,8 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
                 different = 0
                 # Проверяем наличие связи между вершинами x из k_nodes и y из j_nodes
                 for x, y, s, d in connections:
-                    if x > max(k_nodes):
-                        break
-                    elif x in k_nodes and y in j_nodes:
+
+                    if x in k_nodes and y in j_nodes:
                         x_bit = k_sol[k_nodes.index(x)]
                         y_bit = j_sol[j_nodes.index(y)]
                         if  x_bit == y_bit:
@@ -139,9 +139,8 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
             different = 0
             # Проверяем наличие связи между вершинами x из k_nodes и y из j_nodes
             for x, y, s, d in connections:
-                if x > max(k_nodes):
-                    break
-                elif x in k_nodes and y in j_nodes:
+
+                if x in k_nodes and y in j_nodes:
                     x_bit = k_sol[k_nodes.index(x)]
                     y_bit = j_sol[j_nodes.index(y)]
                     if x_bit == y_bit:
@@ -211,9 +210,8 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
                 j_sol = pre_sol[j]
 
                 for x, y, pre_s, pre_d in connections:
-                    if x > max(k_nodes):
-                        break
-                    elif x in k_nodes and y in j_nodes:
+
+                    if x in k_nodes and y in j_nodes:
                         x_bit = k_sol[k_nodes.index(x)]
                         y_bit = j_sol[j_nodes.index(y)]
                         if k_bit == j_bit:
@@ -294,7 +292,7 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
             for i in sub_nodes:
                 sol_dict[i] = sub_sol[sub_nodes.index(i)]
 
-        for i in range(max(list(sol_dict.keys())) + 1):
+        for i in range(min(list(sol_dict.keys())), max(list(sol_dict.keys())) + 1):
             solution += sol_dict[i]
 
         return solution
@@ -302,7 +300,7 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
     def classical_solution(state):
         cut = 0
         for k, j, s, d in reduction_layers[0]:
-            if state[k] != state[j]:
+            if state[k - 1] != state[j - 1]:
                 cut += s
         return cut
 
@@ -340,5 +338,8 @@ def QAOA2(graph, max_size, depth=10, max_iter=10000, visualise=False, callback=F
 
     return solution, q_energy, c_energy, c_s
 
-G = generate_graph(100, 0.7, visualise=False, seed=1000)
-Sol, Q_e, C_e, C_s = QAOA2(G, 5, 5, callback=True, visualise=False, logs=True)
+
+# G, optimal_cut = graph_from_dataset(60)
+#
+# Sol, Q_e, C_e, C_s = QAOA2(G, 10, 5, callback=True, visualise=False, logs=True)
+# print(optimal_cut)
