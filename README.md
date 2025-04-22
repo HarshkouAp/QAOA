@@ -1,0 +1,1 @@
+This package includes tools for effective modeling of QAOA and distributed QAOA (QAOA-in-QAOA). Additionally, the package contains functionality for generating graphs that fully meet the requirements of the QAOA and QAOA2 functions, as well as tools for validating results. For the package to work correctly, upload all files to the local project.
