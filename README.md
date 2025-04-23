@@ -7,7 +7,7 @@ This package provides a software implementation of the ideas proposed in this pa
 Zeqiao Zhou
 Yuxuan Du
 Xinmei Tian
-and Dacheng Tao
+Dacheng Tao
 
 The basic logic of QAOA is presented in the following work:
 
