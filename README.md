@@ -15,8 +15,5 @@ Edward Farhi
 Jeffrey Goldstone
 Sam Gutmann
 
-<div align="center">
-  <img src="/Shnuk_pic.png" alt="pic" width="300"/>
-</div>
 
 
