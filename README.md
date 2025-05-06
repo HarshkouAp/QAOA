@@ -16,7 +16,7 @@ Jeffrey Goldstone
 Sam Gutmann
 
 <center>
-  <img src="QAOA_pic" alt="Пример" width="400"/>
+  <img src="QAOA_pic.png" alt="QAOA_pic" width="400"/>
 </center>
 
 
