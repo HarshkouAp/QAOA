@@ -15,5 +15,9 @@ Edward Farhi
 Jeffrey Goldstone
 Sam Gutmann
 
+<center>
+  <img src="QAOA_pic" alt="Пример" width="400"/>
+</center>
+
 
 
